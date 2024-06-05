@@ -1,0 +1,416 @@
+#include <GL/glut.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <cmath>
+#include <cstdlib> 
+#include <ctime> 
+#include <vector>
+#include <string>
+#include <fstream>
+#include <iostream>
+using namespace std;
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+GLfloat camx = 0, camy = 2, camz = -10;
+GLfloat cam2x = 0, cam2y = 0, cam2z = 0;
+GLfloat cam_upx = 0, cam_upy = 1, cam_upz = 0;
+
+// 전역 변수 선언
+float angle = 0.0; // 관찰자 회전 각도
+float lx = 0.0f, lz = -1.0f; // 관찰자가 바라보는 방향
+float x = 0.0f, y = 5.0f, z = 10.0f; // 관찰자 위치
+
+// 차량 이동을 위한 변수
+float carX = -10.0f, carZ = 0.0f; // 도로 시작점으로 이동
+float carAngle = 90.0f; // 자동차 초기 방향 (도) - 왼쪽에서 오른쪽으로 이동
+bool hasTurned = false; // 차량이 우회전을 했는지 여부
+
+void drawRoad() {
+	// 사거리 도로 그리기
+	glColor3f(1.0f, 0.5f, 0.0f); // 귤색 도로
+	glBegin(GL_QUADS);
+
+	// 세로 도로
+	glVertex3f(-0.5f, 0.0f, -10.0f);
+	glVertex3f(0.5f, 0.0f, -10.0f);
+	glVertex3f(0.5f, 0.0f, 10.0f);
+	glVertex3f(-0.5f, 0.0f, 10.0f);
+
+	// 가로 도로
+	glVertex3f(-10.0f, 0.0f, -0.5f);
+	glVertex3f(10.0f, 0.0f, -0.5f);
+	glVertex3f(10.0f, 0.0f, 0.5f);
+	glVertex3f(-10.0f, 0.0f, 0.5f);
+
+	glEnd();
+
+	// 중앙선 그리기
+	glColor3f(1.0f, 1.0f, 0.0f);
+	glLineWidth(2.0f);
+	glBegin(GL_LINES);
+
+	// 세로 도로의 중앙선
+	glVertex3f(0.0f, 0.0f, -10.0f);
+	glVertex3f(0.0f, 0.0f, 10.0f);
+
+	// 가로 도로의 중앙선
+	glVertex3f(-10.0f, 0.0f, 0.0f);
+	glVertex3f(10.0f, 0.0f, 0.0f);
+
+	glEnd();
+}
+void drawBuilding(float x, float z, float height) {
+	// 건물 그리기
+	glColor3f(0.5f, 0.5f, 0.5f);
+	glPushMatrix();
+	glTranslatef(x, height / 2.0f, z);
+	glScalef(1.0f, height, 1.0f);
+	glutSolidCube(1.0);
+	glPopMatrix();
+}
+
+void drawCar(float x, float z, float angle) {
+	// 차량 그리기
+	glColor3f(1.0f, 0.0f, 0.0f);
+	glPushMatrix();
+	glTranslatef(x, 0.25f, z);
+	glRotatef(angle, 0.0f, 1.0f, 0.0f); // 차량의 진행 방향을 회전
+	glScalef(0.5f, 0.5f, 1.0f);
+	glutSolidCube(1.0);
+	glPopMatrix();
+}
+
+void computePos(float deltaMove) {
+	x += deltaMove * lx * 0.1f;
+	z += deltaMove * lz * 0.1f;
+	y -= deltaMove * 0.1f; 
+}
+
+void computeDir(float deltaAngle) {
+	angle += deltaAngle;
+	lx = sin(angle);
+	lz = -cos(angle);
+	//gluLookAt(x, y, z, x + lx, y, z + lz, 0.0f, 1.0f, 0.0f); // 시점 방향 변경
+}
+void processNormalKeys(unsigned char key, int xx, int yy) {
+	switch (key) {
+	case 's': computePos(0.5f); break;
+	case 'd': computePos(-0.5f); break;
+	case 'r': computeDir(0.5f); break;
+	case 'l': computeDir(-0.5f); break;
+	}
+}
+void update(int value) {
+	// 차량 이동 업데이트
+	float delta = 0.1f;
+
+	// 우회전하기 전에는 가로 도로에서 이동
+	if (!hasTurned) {
+		// 차량의 위치 업데이트
+		carX += delta;
+
+		// 사거리에 도달하면 우회전
+		if (carX >= -0.3f && carX <= 0.3f && carZ >= -0.3f && carZ <= 0.3f) {
+			carAngle -= 90.0f;
+			hasTurned = true;
+		}
+	}
+	else {
+		// 우회전 후에는 세로 도로에서 이동
+		// 차량의 위치 업데이트
+		carZ += delta;
+
+		// 세로 도로 끝에 도달하면 초기화
+		if (carZ < -10.0f) {
+			carX = -10.0f;
+			carZ = 0.0f;
+			carAngle = 90.0f;
+			hasTurned = false;
+		}
+	}
+
+	// 화면 갱신
+	glutPostRedisplay();
+	glutTimerFunc(16, update, 0); // 약 60 FPS로 업데이트
+}
+
+class CPoint2f {
+public:
+	vector <float> d{ 0, 0 };
+};
+class CPoint3f {
+public:
+	vector <float> d{ 0, 0, 0 };
+};
+class CPoint3i {
+public:
+	vector <int> d{ 0, 0, 0 };
+};
+class CFace {
+public:
+	vector <CPoint3i> v_pairs;
+};
+class CObj {
+public:
+	string name;
+	vector <CPoint3f> v;
+	vector <CPoint2f> vt;
+	vector <CPoint3f> vn;
+	vector <CFace> f;
+};
+class CModel {
+public:
+	vector <CObj> objs;
+
+	vector<float> my_strtok_f(char* str, char* delimeter) {
+		vector <float> v;
+		char* context;
+		char* tok = strtok_s(str, delimeter, &context);
+
+		while (tok != NULL) {
+			v.push_back(atof(tok));
+			tok = strtok_s(NULL, delimeter, &context);
+		}
+		return v;
+	}
+	vector<string> my_strtok_s(char* str, char* delimeter) {
+		vector <string> v;
+		char* context;
+		char* tok = strtok_s(str, delimeter, &context);
+
+		while (tok != NULL) {
+			v.push_back(tok);
+			tok = strtok_s(context, delimeter, &context);
+		}
+		return v;
+	}
+	vector<int> my_strtok_i(char* str, char* delimeter) {
+		vector <int> v;
+		char* context;
+		char* tok = strtok_s(str, delimeter, &context);
+
+		while (tok != NULL) {
+			v.push_back(atoi(tok));
+			tok = strtok_s(context, delimeter, &context);
+		}
+		return v;
+	}
+	void loadObj(ifstream& fin) {
+		string line;
+		CObj obj_tmp;
+		int cnt = 0;
+		int cnt_prev_vertex = 0;
+		int cnt_prev_texture = 0;
+		int cnt_prev_normal = 0;
+
+		while (getline(fin, line)) {
+			int len = line.length();
+			vector<float> vf;
+			vector<string> s;
+			vector<int> vi;
+			CPoint3f p3;
+			CPoint2f p2;
+			CPoint3i p3i;
+			if (line[0] == 'o' && line[1] == ' ') {
+				obj_tmp.name = line.substr(2, len - 2);
+				objs.push_back(obj_tmp);
+				if (cnt > 0) {
+					cnt_prev_vertex += objs[cnt - 1].v.size();
+					cnt_prev_texture += objs[cnt - 1].vt.size();
+					cnt_prev_normal += objs[cnt - 1].vn.size();
+				}
+				cnt += 1;
+			}
+
+			if (line[0] == 'v' && line[1] == ' ') {
+				vf = my_strtok_f((char*)line.substr(2, len - 2).c_str(), (char*)" ");
+				p3.d = { vf[0], vf[1], vf[2] };
+				objs[cnt - 1].v.push_back(p3);
+			}
+			else if (line[0] == 'v' && line[1] == 't') {
+				vf = my_strtok_f((char*)line.substr(3, len - 3).c_str(), (char*)" ");
+				p2.d = { vf[0], vf[1] };
+				objs[cnt - 1].vt.push_back(p2);
+			}
+			else if (line[0] == 'v' && line[1] == 'n') {
+				vf = my_strtok_f((char*)line.substr(3, len - 3).c_str(), (char*)" ");
+				p3.d = { vf[0], vf[1], vf[2] };
+				objs[cnt - 1].vn.push_back(p3);
+			}
+			else if (line[0] == 'f' && line[1] == ' ') {
+				s = my_strtok_s((char*)line.substr(2, len - 2).c_str(), (char*)" ");
+				int nVertexes = s.size();
+				CFace face_tmp;
+				for (int i = 0; i < nVertexes; i++) {
+					vi = my_strtok_i((char*)s[i].c_str(), (char*)"/");
+					p3i.d = { vi[0] - cnt_prev_vertex, vi[1] - cnt_prev_texture, vi[2] - cnt_prev_normal };
+					face_tmp.v_pairs.push_back(p3i);
+				}
+				objs[cnt - 1].f.push_back(face_tmp);
+			}
+		}
+	}
+};
+CModel m;
+
+void reshape(int width, int height) {
+	glViewport(0, 0, width, height);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	GLfloat ratio = (float)width / height;
+	gluPerspective(40, ratio, 0.1, 1000);
+}
+void set_light() {
+	// 빛의 색상 & 위치 정의
+	//GLfloat light_global_ambient[] = { 0.3, 0.3, 0.3, 1.0 };
+	GLfloat light_0_pos[] = { 0.0, 10.0, 0.0, 1.0 };//{ 2.0, 2.0, 2.0, 1.0 };
+	GLfloat light_0_ambient[] = { 0.2, 0.2, 0.2, 1.0 };//{ 1.0, 1.0, 1.0, 1.0 };
+	GLfloat light_0_diffuse[] = { 0.8, 0.8, 0.8, 1.0 };//{ 0.0, 0.0, 1.0, 1.0 };
+	GLfloat light_0_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+
+	// 빛 활성화, 빛 색상 & 위치 적용
+	//glLightModelfv(GL_LIGHT_MODEL_AMBIENT, light_global_ambient);
+	//glEnable(GL_LIGHT0);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, light_0_ambient);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, light_0_diffuse);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, light_0_specular);
+	glLightfv(GL_LIGHT0, GL_POSITION, light_0_pos);
+
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+	glEnable(GL_COLOR_MATERIAL);
+	glEnable(GL_DEPTH_TEST);
+
+};
+void set_material_color() {
+	// 물체 색상 정의 & 지정
+	glDisable(GL_COLOR_MATERIAL);
+	GLfloat matrial_0_ambient[] = { 0.3, 0.3, 0.3, 1.0 };
+	GLfloat matrial_0_diffuse[] = { 0.8, 0.0, 0.3, 1.0 };
+	GLfloat matrial_0_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+	GLfloat matrial_0_shininess[] = { 25.0 };
+	glMaterialfv(GL_FRONT, GL_AMBIENT, matrial_0_ambient);
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, matrial_0_diffuse);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, matrial_0_specular);
+	glMaterialfv(GL_FRONT, GL_SHININESS, matrial_0_shininess);
+};
+void display_objs() {
+	GLfloat x, y, z, nx, ny, nz;
+	int v_id, vt_id, vn_id;
+
+	for (int o = 0; o < m.objs.size(); o++) {
+		int nFaces = m.objs[o].f.size();
+
+		glPushMatrix();
+		glTranslatef(5.0f, -2.0f, 2.0f); // 도로 옆으로 위치 이동
+
+		for (int k = 0; k < nFaces; k++) {
+			int nPoints = m.objs[o].f[k].v_pairs.size();
+			glBegin(GL_POLYGON);
+
+			for (int i = 0; i < nPoints; i++) {
+				v_id = m.objs[o].f[k].v_pairs[i].d[0];
+				vt_id = m.objs[o].f[k].v_pairs[i].d[1];
+				vn_id = m.objs[o].f[k].v_pairs[i].d[2];
+				x = m.objs[o].v[v_id - 1].d[0];
+				y = m.objs[o].v[v_id - 1].d[1];
+				z = m.objs[o].v[v_id - 1].d[2];
+
+				nx = m.objs[o].vn[vn_id - 1].d[0];
+				ny = m.objs[o].vn[vn_id - 1].d[1];
+				nz = m.objs[o].vn[vn_id - 1].d[2];
+				glNormal3f(nx, ny, nz);
+				glVertex3f(x, y, z);
+			}
+
+			glEnd();
+		}
+
+		glPopMatrix();
+	}
+}
+
+
+void display() {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	//gluLookAt(camx, camy, camz, cam2x, cam2y, cam2z, cam_upx, cam_upy, cam_upz);
+	gluLookAt(x + 5.0f, y + 15.0f, z + 15.0f, x, 0.0f, z, 0.0f, 1.0f, 0.0f);
+	// 도로 그리기
+	drawRoad();
+
+	// 건물 그리기 (층이 모두 다른 건물 5개 추가)
+	drawBuilding(-3.0f, 3.0f, 2.0f);   // 건물 1
+	drawBuilding(3.0f, -3.0f, 3.0f);   // 건물 2
+	drawBuilding(-3.0f, -3.0f, 4.0f);  // 건물 3
+	drawBuilding(3.0f, 3.0f, 5.0f);    // 건물 4
+	drawBuilding(-6.0f, 6.0f, 6.0f);   // 건물 5
+
+	// 차량 그리기
+	drawCar(carX, carZ, carAngle);
+
+	//set_light();
+	//set_material_color();
+	display_objs();
+	glutSwapBuffers(); 
+}
+
+void initLighting() {
+	//glEnable(GL_LIGHTING);
+	//glShadeModel(GL_SMOOTH);
+	//glEnable(GL_DEPTH_TEST);
+
+	//glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
+	GLfloat light_position[] = { 0.0, 10.0, 0.0, 1.0 };
+	GLfloat light_ambient[] = { 0.2, 0.2, 0.2, 1.0 };
+	GLfloat light_diffuse[] = { 0.8, 0.8, 0.8, 1.0 };
+	GLfloat light_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+
+	glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+	glEnable(GL_COLOR_MATERIAL);
+	glEnable(GL_DEPTH_TEST);
+}
+
+int main(int argc, char** argv) {
+	string filepath = "C:/Users/1028e/OneDrive/바탕 화면/cube/cube.obj";
+	ifstream fin(filepath);
+
+	m.loadObj(fin);
+	fin.close();
+
+	//gl 
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
+	glutInitWindowPosition(100, 100);
+	glutInitWindowSize(800, 600);
+	glutCreateWindow("3D City Scene");
+
+	// 조명 초기화
+	initLighting(); 
+
+	glutDisplayFunc(display);
+	//glutReshapeFunc(reshape);
+	glutReshapeFunc([](int w, int h) {
+		if (h == 0) h = 1;
+		float ratio = w * 1.0 / h;
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		gluPerspective(45.0, ratio, 0.1, 100.0);
+		glMatrixMode(GL_MODELVIEW);
+		});
+
+	glutKeyboardFunc(processNormalKeys);
+	glutTimerFunc(16, update, 0);
+	glutMainLoop();
+	return 0;
+}
